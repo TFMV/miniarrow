@@ -1,6 +1,7 @@
 import pyarrow as pa
 import pyarrow.compute as pc
 
+
 class MiniQueryEngine:
     def __init__(self):
         self.tables = {}
@@ -29,10 +30,12 @@ class MiniQueryEngine:
             "<": pc.less,
             ">=": pc.greater_equal,
             "<=": pc.less_equal,
-            "!=": pc.not_equal
+            "!=": pc.not_equal,
         }
         if condition not in conditions:
-            raise ValueError(f"Unsupported condition. Use one of: {list(conditions.keys())}")
+            raise ValueError(
+                f"Unsupported condition. Use one of: {list(conditions.keys())}"
+            )
 
         mask = conditions[condition](column, value)
         filtered_table = table.filter(mask)
@@ -54,15 +57,21 @@ class MiniQueryEngine:
             "mean": pc.mean,
             "min": pc.min,
             "max": pc.max,
-            "count": lambda col: pa.array([len(col)])
+            "count": lambda col: pa.array([len(col)]),
         }
         if agg_func not in functions:
-            raise ValueError(f"Unsupported aggregation function. Use one of: {list(functions.keys())}")
+            raise ValueError(
+                f"Unsupported aggregation function. Use one of: {list(functions.keys())}"
+            )
 
         result = functions[agg_func](column)
-        return result.as_py() if isinstance(result, pa.Scalar) else result.to_pylist()[0]
+        return (
+            result.as_py() if isinstance(result, pa.Scalar) else result.to_pylist()[0]
+        )
 
-    def join_tables(self, left_table, right_table, left_key, right_key, join_type='inner'):
+    def join_tables(
+        self, left_table, right_table, left_key, right_key, join_type="inner"
+    ):
         """
         Perform a join between two tables.
         Supported join types: 'inner', 'left', 'right', 'full', 'left_semi', 'right_semi'.
@@ -73,7 +82,14 @@ class MiniQueryEngine:
         left = self.tables[left_table]
         right = self.tables[right_table]
 
-        supported_join_types = ['inner', 'left', 'right', 'full', 'left_semi', 'right_semi']
+        supported_join_types = [
+            "inner",
+            "left",
+            "right",
+            "full",
+            "left_semi",
+            "right_semi",
+        ]
         if join_type not in supported_join_types:
             raise ValueError(f"Join type must be one of: {supported_join_types}")
 
@@ -88,7 +104,9 @@ class MiniQueryEngine:
             raise ValueError(f"Table '{table_name}' does not exist.")
 
         table = self.tables[table_name]
-        sorted_table = table.sort_by([(column_name, "ascending" if ascending else "descending")])
+        sorted_table = table.sort_by(
+            [(column_name, "ascending" if ascending else "descending")]
+        )
         return sorted_table.to_pydict()
 
     def group_by(self, table_name, group_column, agg_column, agg_func):
@@ -100,7 +118,9 @@ class MiniQueryEngine:
 
         table = self.tables[table_name]
         if agg_func not in ["sum", "mean", "min", "max", "count"]:
-            raise ValueError("Unsupported aggregation function. Use one of: sum, mean, min, max, count.")
+            raise ValueError(
+                "Unsupported aggregation function. Use one of: sum, mean, min, max, count."
+            )
 
         grouped_table = table.group_by([group_column]).aggregate(
             [(agg_func, agg_column)]
