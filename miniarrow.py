@@ -1,5 +1,6 @@
 import pyarrow as pa
 import pyarrow.compute as pc
+import time
 
 
 class MiniQueryEngine:
@@ -133,8 +134,13 @@ class MiniQueryEngine:
             )
 
         # Validate aggregation function compatibility with column type
-        if agg_func in ["sum", "mean"] and not pa.types.is_numeric(column.type):
-            raise TypeError(f"Aggregation '{agg_func}' requires numeric column type")
+        if agg_func in ["sum", "mean"]:
+            if not (
+                pa.types.is_integer(column.type) or pa.types.is_floating(column.type)
+            ):
+                raise TypeError(
+                    f"Aggregation '{agg_func}' requires numeric column type"
+                )
 
         try:
             result = functions[agg_func](column)
@@ -218,13 +224,22 @@ class MiniQueryEngine:
         if agg_func not in ["sum", "mean", "min", "max", "count"]:
             raise ValueError("Unsupported aggregation function.")
 
-        grouped_table = table.group_by([group_column]).aggregate(
-            [(agg_func, agg_column)]
-        )
+        # Create the aggregation expression using string names
+        aggregations = [(agg_column, agg_func)]
+
+        grouped_table = table.group_by(group_column).aggregate(aggregations)
         return grouped_table.to_pydict()
 
 
 if __name__ == "__main__":
+
+    def benchmark(func, *args, **kwargs):
+        """Simple benchmark wrapper that measures execution time"""
+        start = time.perf_counter()
+        result = func(*args, **kwargs)
+        duration = (time.perf_counter() - start) * 1000  # Convert to milliseconds
+        return result, duration
+
     engine = MiniQueryEngine()
 
     # Create sample tables
@@ -244,8 +259,37 @@ if __name__ == "__main__":
     )
 
     # Perform a full outer join
-    result = engine.join_tables(
-        "left_table", "right_table", ["id"], ["id"], join_type="full outer"
+    result, duration = benchmark(
+        engine.join_tables,
+        "left_table",
+        "right_table",
+        ["id"],
+        ["id"],
+        join_type="full outer",
     )
-    print("Full Outer Join Result:")
+    print("Full Outer Join Result (took {:.2f}ms):".format(duration))
     print(result)
+
+    # Filter the table
+    filtered, duration = benchmark(engine.filter_table, "left_table", "value", ">", 15)
+    print("\nFiltered Table (took {:.2f}ms):".format(duration))
+    print(filtered)
+
+    # Aggregate the table
+    aggregated, duration = benchmark(
+        engine.aggregate_table, "left_table", "value", "sum"
+    )
+    print("\nAggregated Table (took {:.2f}ms):".format(duration))
+    print(aggregated)
+
+    # Group by a column and apply an aggregation function
+    grouped, duration = benchmark(engine.group_by, "left_table", "id", "value", "sum")
+    print("\nGrouped Table (took {:.2f}ms):".format(duration))
+    print(grouped)
+
+    # Sort the table
+    sorted_table, duration = benchmark(
+        engine.sort_table, "left_table", "value", ascending=False
+    )
+    print("\nSorted Table (took {:.2f}ms):".format(duration))
+    print(sorted_table)
