@@ -2,7 +2,7 @@ import time
 import random
 import string
 from pyarrow import Table
-from miniarrow import MiniQueryEngine  # Assuming your implementation is saved in miniarrow.py
+from miniarrow import MiniQueryEngine
 
 
 def generate_synthetic_data(rows, num_columns=5):
