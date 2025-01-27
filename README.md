@@ -18,30 +18,64 @@ Here's a simple example to get you started:
 # Initialize the query engine
 engine = MiniQueryEngine()
 
+def benchmark(func, *args, **kwargs):
+    """Simple benchmark wrapper that measures execution time"""
+    start = time.perf_counter()
+    result = func(*args, **kwargs)
+    duration = (time.perf_counter() - start) * 1000  # Convert to milliseconds
+    return result, duration
+
+engine = MiniQueryEngine()
+
 # Create sample tables
-engine.create_table("users", {
-    "user_id": [1, 2, 3, 4],
-    "name": ["Alice", "Bob", "Charlie", "Diana"],
-    "age": [25, 30, 35, 40]
-})
+engine.create_table(
+    "left_table",
+    {
+        "id": [1, 2, 3],
+        "value": [10, 20, 30],
+    },
+)
+engine.create_table(
+    "right_table",
+    {
+        "id": [2, 3, 4],
+        "value": [200, 300, 400],
+    },
+)
 
-engine.create_table("orders", {
-    "order_id": [101, 102, 103],
-    "user_id": [1, 2, 3],
-    "amount": [250, 450, 300]
-})
+# Perform a full outer join
+result, duration = benchmark(
+    engine.join_tables,
+    "left_table",
+    "right_table",
+    ["id"],
+    ["id"],
+    join_type="full outer",
+)
+print("Full Outer Join Result (took {:.2f}ms):".format(duration))
+print(result)
 
-# Filter users older than 30
-filtered_users = engine.filter_table("users", "age", ">", 30)
-print("Filtered Users:")
-print(filtered_users)
+# Filter the table
+filtered, duration = benchmark(engine.filter_table, "left_table", "value", ">", 15)
+print("\nFiltered Table (took {:.2f}ms):".format(duration))
+print(filtered)
 
-# Aggregate total order amount
-total_amount = engine.aggregate_table("orders", "amount", "sum")
-print("\nTotal Order Amount:", total_amount)
+# Aggregate the table
+aggregated, duration = benchmark(
+    engine.aggregate_table, "left_table", "value", "sum"
+)
+print("\nAggregated Table (took {:.2f}ms):".format(duration))
+print(aggregated)
 
-# Join users and orders
-joined_table = engine.join_tables("users", "orders", "user_id", "user_id")
-print("\nJoined Table:")
-print(joined_table)
+# Group by a column and apply an aggregation function
+grouped, duration = benchmark(engine.group_by, "left_table", "id", "value", "sum")
+print("\nGrouped Table (took {:.2f}ms):".format(duration))
+print(grouped)
+
+# Sort the table
+sorted_table, duration = benchmark(
+    engine.sort_table, "left_table", "value", ascending=False
+)
+print("\nSorted Table (took {:.2f}ms):".format(duration))
+print(sorted_table)
 ```
