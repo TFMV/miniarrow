@@ -22,7 +22,7 @@ def generate_synthetic_data(rows, num_columns=5):
             data[f"int_col_{col_id}"] = [random.randint(0, 1000) for _ in range(rows)]
         else:  # Odd columns are strings
             data[f"str_col_{col_id}"] = [
-                ''.join(random.choices(string.ascii_letters, k=10)) for _ in range(rows)
+                "".join(random.choices(string.ascii_letters, k=10)) for _ in range(rows)
             ]
     return data
 
@@ -36,7 +36,7 @@ def print_statistics(data):
     """
     num_rows = len(next(iter(data.values())))
     num_columns = len(data)
-    print(f"Dataset Statistics:")
+    print("Dataset Statistics:")
     print(f"  Total Records: {num_rows}")
     print(f"  Total Columns: {num_columns}")
 
@@ -71,7 +71,9 @@ def benchmark_aggregate(engine, table_name, column_name, agg_func):
     start_time = time.perf_counter()
     result = engine.aggregate_table(table_name, column_name, agg_func)
     elapsed_time = time.perf_counter() - start_time
-    print(f"Aggregate Benchmark ({agg_func}): {elapsed_time:.6f} seconds | Result: {result}")
+    print(
+        f"Aggregate Benchmark ({agg_func}): {elapsed_time:.6f} seconds | Result: {result}"
+    )
 
 
 def benchmark_sort(engine, table_name, column_name):

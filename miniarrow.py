@@ -23,7 +23,21 @@ class MiniQueryEngine:
         Args:
             name (str): Name of the table.
             data (dict): Dictionary where keys are column names and values are lists.
+
+        Raises:
+            ValueError: If name is empty or data is not a dictionary.
+            TypeError: If data values are not lists or have inconsistent lengths.
         """
+        if not name or not isinstance(name, str):
+            raise ValueError("Table name must be a non-empty string")
+        if not isinstance(data, dict) or not data:
+            raise ValueError("Data must be a non-empty dictionary")
+
+        # Validate data structure
+        lengths = set(len(col) for col in data.values())
+        if len(lengths) > 1:
+            raise TypeError("All columns must have the same length")
+
         self.tables[name] = pa.Table.from_pydict(data)
 
     def filter_table(self, table_name, column_name, condition, value):
@@ -38,12 +52,29 @@ class MiniQueryEngine:
 
         Returns:
             dict: Filtered table as a dictionary of lists.
+
+        Raises:
+            ValueError: If table doesn't exist or column not found.
+            TypeError: If value type doesn't match column type.
         """
         if table_name not in self.tables:
             raise ValueError(f"Table '{table_name}' does not exist.")
 
         table = self.tables[table_name]
+        if column_name not in table.column_names:
+            raise ValueError(
+                f"Column '{column_name}' not found in table '{table_name}'"
+            )
+
         column = table[column_name]
+
+        # Validate value type matches column type
+        try:
+            pa.array([value], type=column.type)
+        except (TypeError, pa.ArrowInvalid):
+            raise TypeError(
+                f"Value type {type(value)} doesn't match column type {column.type}"
+            )
 
         conditions = {
             "==": pc.equal,
@@ -73,11 +104,20 @@ class MiniQueryEngine:
 
         Returns:
             Result of the aggregation.
+
+        Raises:
+            ValueError: If table/column doesn't exist or invalid aggregation function.
+            TypeError: If column type doesn't support the aggregation function.
         """
         if table_name not in self.tables:
             raise ValueError(f"Table '{table_name}' does not exist.")
 
         table = self.tables[table_name]
+        if column_name not in table.column_names:
+            raise ValueError(
+                f"Column '{column_name}' not found in table '{table_name}'"
+            )
+
         column = table[column_name]
 
         functions = {
@@ -92,19 +132,28 @@ class MiniQueryEngine:
                 f"Unsupported aggregation function. Use one of: {list(functions.keys())}"
             )
 
-        result = functions[agg_func](column)
-        return result.as_py()
+        # Validate aggregation function compatibility with column type
+        if agg_func in ["sum", "mean"] and not pa.types.is_numeric(column.type):
+            raise TypeError(f"Aggregation '{agg_func}' requires numeric column type")
 
-    def join_tables(self, left_table, right_table, left_key, right_key, join_type="inner"):
+        try:
+            result = functions[agg_func](column)
+            return result.as_py()
+        except pa.ArrowInvalid as e:
+            raise TypeError(f"Aggregation failed: {str(e)}")
+
+    def join_tables(
+        self, left_table, right_table, left_keys, right_keys, join_type="inner"
+    ):
         """
-        Perform a join between two tables.
+        Perform a join between two tables with support for multi-column and full outer joins.
 
         Args:
             left_table (str): Name of the left table.
             right_table (str): Name of the right table.
-            left_key (str): Key column in the left table.
-            right_key (str): Key column in the right table.
-            join_type (str): Type of join ('inner', 'left', 'right', 'full').
+            left_keys (list[str]): List of key columns in the left table.
+            right_keys (list[str]): List of key columns in the right table.
+            join_type (str): Type of join ('inner', 'left', 'right', 'full outer').
 
         Returns:
             dict: Resulting table as a dictionary of lists.
@@ -112,14 +161,20 @@ class MiniQueryEngine:
         if left_table not in self.tables or right_table not in self.tables:
             raise ValueError("One or both tables do not exist.")
 
+        if len(left_keys) != len(right_keys):
+            raise ValueError("Number of join keys must match for both tables.")
+
         left = self.tables[left_table]
         right = self.tables[right_table]
 
-        supported_join_types = ["inner", "left", "right", "full"]
+        supported_join_types = ["inner", "left", "right", "full outer"]
         if join_type not in supported_join_types:
             raise ValueError(f"Join type must be one of: {supported_join_types}")
+        else:
+            result = left.join(
+                right, keys=left_keys, right_keys=right_keys, join_type=join_type
+            )
 
-        result = left.join(right, left_key, right_key, join_type=join_type)
         return result.to_pydict()
 
     def sort_table(self, table_name, column_name, ascending=True):
@@ -138,7 +193,9 @@ class MiniQueryEngine:
             raise ValueError(f"Table '{table_name}' does not exist.")
 
         table = self.tables[table_name]
-        sorted_table = table.sort_by([(column_name, "ascending" if ascending else "descending")])
+        sorted_table = table.sort_by(
+            [(column_name, "ascending" if ascending else "descending")]
+        )
         return sorted_table.to_pydict()
 
     def group_by(self, table_name, group_column, agg_column, agg_func):
@@ -161,20 +218,34 @@ class MiniQueryEngine:
         if agg_func not in ["sum", "mean", "min", "max", "count"]:
             raise ValueError("Unsupported aggregation function.")
 
-        grouped_table = table.group_by([group_column]).aggregate([(agg_func, agg_column)])
+        grouped_table = table.group_by([group_column]).aggregate(
+            [(agg_func, agg_column)]
+        )
         return grouped_table.to_pydict()
 
 
-# Example Usage
 if __name__ == "__main__":
     engine = MiniQueryEngine()
 
-    engine.create_table("users", {
-        "user_id": [1, 2, 3, 4],
-        "name": ["Alice", "Bob", "Charlie", "Diana"],
-        "age": [25, 30, 35, 40]
-    })
+    # Create sample tables
+    engine.create_table(
+        "left_table",
+        {
+            "id": [1, 2, 3],
+            "value": [10, 20, 30],
+        },
+    )
+    engine.create_table(
+        "right_table",
+        {
+            "id": [2, 3, 4],
+            "value": [200, 300, 400],
+        },
+    )
 
-    # Example operations
-    filtered = engine.filter_table("users", "age", ">", 30)
-    print(filtered)
+    # Perform a full outer join
+    result = engine.join_tables(
+        "left_table", "right_table", ["id"], ["id"], join_type="full outer"
+    )
+    print("Full Outer Join Result:")
+    print(result)
