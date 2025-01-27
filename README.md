@@ -7,20 +7,13 @@ The Mini Arrow Query Engine is a lightweight, in-memory query engine built using
 - **Create Tables**: Convert Python dictionaries into Apache Arrow tables.
 - **Filtering**: Easily filter data based on conditions.
 - **Aggregation**: Perform common aggregate functions like sum, average, count, etc.
-- **Joining**: Join tables on specified columns.
-
-## Installation
-
-```bash
-pip install miniarrow
-```
+- **Joining**: Join tables on specified columns. Join types supported: inner, left, right, full outer.
 
 ## Usage
 
 Here's a simple example to get you started:
 
 ```python
-from mini_arrow_engine import MiniQueryEngine
 
 # Initialize the query engine
 engine = MiniQueryEngine()
