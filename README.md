@@ -79,3 +79,13 @@ sorted_table, duration = benchmark(
 print("\nSorted Table (took {:.2f}ms):".format(duration))
 print(sorted_table)
 ```
+
+```bash
+☁  miniarrow [feature/bench] python bench.py
+Dataset Statistics:
+  Total Records: 1000000
+  Total Columns: 5
+Filter Benchmark: 0.602990 seconds
+Aggregate Benchmark (sum): 0.001396 seconds | Result: 500536359
+Sort Benchmark: 1.181422 seconds
+```
